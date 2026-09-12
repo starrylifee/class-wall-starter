@@ -30,8 +30,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 무료 티어로 사용 가능한 Gemini 1.5 Flash 모델 엔드포인트
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 최신 Gemini 2.0 Flash 모델 (기본 무료 티어 지원)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
 
     const prompt = `너는 초·중등학교 교실의 따뜻하고 격려를 아끼지 않는 친절한 AI 선생님 도우미야.
 학생이 작성한 아래 메모 글을 읽고, 학생에게 힘이 되고 배움을 응원하는 다정하고 긍정적인 한 줄 코멘트(1~2문장, 80자 이내)를 작성해줘. 이모지도 친근하게 1~2개 곁들여줘.
