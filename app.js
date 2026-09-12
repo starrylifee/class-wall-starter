@@ -15,6 +15,13 @@ import {
   onSnapshot,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Firebase 프로젝트 설정
 const firebaseConfig = {
@@ -29,6 +36,12 @@ const firebaseConfig = {
 // Firebase 초기화
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+// 현재 로그인한 사용자 정보 (로그아웃 시 null)
+let currentUser = null;
+
 
 
 
@@ -54,6 +67,8 @@ function loadMemos() {
       memos.push({
         id: docSnap.id,
         text: data.text,
+        uid: data.uid || null,
+        author: data.author || "",
         createdAt: data.createdAt ? data.createdAt.toMillis?.() || data.createdAt : Date.now()
       });
     });
@@ -63,13 +78,16 @@ function loadMemos() {
 }
 
 // 메모를 새로 씁니다.
-// Firestore의 memos 컬렉션에 새 문서를 추가합니다.
+// Firestore의 memos 컬렉션에 새 문서를 추가합니다 (로그인 시 uid와 작성자 이름 함께 저장).
 async function addMemo(text) {
   try {
-    await addDoc(collection(db, "memos"), {
+    const memoData = {
       text: text,
-      createdAt: serverTimestamp()
-    });
+      createdAt: serverTimestamp(),
+      uid: currentUser ? currentUser.uid : null,
+      author: currentUser ? (currentUser.displayName || "익명") : "익명"
+    };
+    await addDoc(collection(db, "memos"), memoData);
   } catch (error) {
     console.error("메모 저장 실패:", error);
   }
@@ -85,6 +103,60 @@ async function deleteMemo(id) {
   }
 }
 
+
+
+// ===================================================
+// 로그인 / 로그아웃 처리
+// ===================================================
+
+// 구글 로그인 팝업 띄우기
+async function login() {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error("로그인 실패:", error);
+  }
+}
+
+// 로그아웃
+async function logout() {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("로그아웃 실패:", error);
+  }
+}
+
+// 로그인 상태 변경 감지
+onAuthStateChanged(auth, function (user) {
+  currentUser = user;
+  renderUserArea();
+  render(); // 내 메모에만 삭제 버튼을 보이게 하기 위해 재렌더링
+});
+
+// 로그인 영역 화면 그리기
+function renderUserArea() {
+  const userArea = document.getElementById("userArea");
+  userArea.innerHTML = "";
+
+  if (currentUser) {
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = (currentUser.displayName || "로그인 됨") + " 님 환영합니다! ";
+
+    const logoutBtn = document.createElement("button");
+    logoutBtn.textContent = "로그아웃";
+    logoutBtn.onclick = logout;
+
+    userArea.appendChild(nameSpan);
+    userArea.appendChild(logoutBtn);
+  } else {
+    const loginBtn = document.createElement("button");
+    loginBtn.textContent = "Google 계정으로 로그인";
+    loginBtn.onclick = login;
+
+    userArea.appendChild(loginBtn);
+  }
+}
 
 
 // ===================================================
@@ -105,16 +177,30 @@ function makeMemo(memo) {
   const div = document.createElement("div");
   div.className = "memo";
 
-  const del = document.createElement("button");
-  del.textContent = "×";
-  del.onclick = function () {
-    deleteMemo(memo.id);
-  };
-  div.appendChild(del);
+  // 삭제 버튼: 내가 쓴 메모이거나, uid 정보가 없는 기존 메모일 때만 표시
+  const canDelete = !memo.uid || (currentUser && currentUser.uid === memo.uid);
+  if (canDelete) {
+    const del = document.createElement("button");
+    del.textContent = "×";
+    del.onclick = function () {
+      deleteMemo(memo.id);
+    };
+    div.appendChild(del);
+  }
 
   const span = document.createElement("span");
   span.textContent = memo.text;
   div.appendChild(span);
+
+  // 작성자 정보가 있으면 하단에 작게 표시
+  if (memo.author) {
+    const authorDiv = document.createElement("div");
+    authorDiv.style.fontSize = "12px";
+    authorDiv.style.color = "#888";
+    authorDiv.style.marginTop = "8px";
+    authorDiv.textContent = memo.author;
+    div.appendChild(authorDiv);
+  }
 
   return div;
 }
@@ -143,4 +229,5 @@ input.onkeydown = function (e) {
 // 메모 실시간 불러오기 시작 및 입력창 포커스
 loadMemos();
 input.focus();
+
 
