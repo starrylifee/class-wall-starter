@@ -19,8 +19,12 @@
 
     /* 메모가 붙는 담벼락 */
     #wall { display: flex; flex-wrap: wrap; gap: 10px; }
-    .memo { border: 1px solid #ddd; background: #fffde7; padding: 10px; width: 200px; font-size: 15px; }
-    .memo button { float: right; }
+    .memo { border: 1px solid #ddd; background: #fffde7; padding: 10px; width: 220px; font-size: 15px; position: relative; }
+    .memo .del-btn { float: right; border: none; background: transparent; cursor: pointer; font-size: 16px; color: #999; }
+    .memo .del-btn:hover { color: #f44336; }
+    .memo .ai-btn { margin-top: 8px; font-size: 12px; padding: 3px 8px; border: 1px solid #c8e6c9; background: #e8f5e9; color: #2e7d32; border-radius: 4px; cursor: pointer; display: block; }
+    .memo .ai-btn:hover { background: #c8e6c9; }
+    .memo .ai-comment-box { margin-top: 8px; padding: 8px; background: #f1f8e9; border-left: 3px solid #66bb6a; border-radius: 4px; font-size: 13px; color: #2e7d32; line-height: 1.4; }
   </style>
 </head>
 <body>

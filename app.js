@@ -9,6 +9,7 @@ import {
   collection,
   addDoc,
   deleteDoc,
+  updateDoc,
   doc,
   query,
   orderBy,
@@ -88,6 +89,7 @@ function loadMemos() {
         text: data.text,
         uid: data.uid || null,
         author: data.author || "",
+        aiComment: data.aiComment || null,
         createdAt: data.createdAt ? data.createdAt.toMillis?.() || data.createdAt : Date.now()
       });
     });
@@ -140,6 +142,40 @@ async function deleteMemo(id) {
     console.error("메모 삭제 실패:", error);
   }
 }
+
+// AI 코멘트 요청 함수 (교사 전용)
+// Vercel 서버리스 함수(/api/gemini)를 호출하고 그 결과를 Firestore에 저장합니다.
+async function requestAiComment(id, text) {
+  if (currentUserRole !== "teacher") {
+    alert("AI 코멘트는 선생님만 요청할 수 있습니다.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: text })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      alert("AI 코멘트 생성 실패: " + (data.error || "서버 오류"));
+      return;
+    }
+
+    // Firestore 해당 메모 문서에 aiComment 필드 업데이트
+    await updateDoc(doc(db, "memos", id), {
+      aiComment: data.comment
+    });
+  } catch (error) {
+    console.error("AI 코멘트 요청 오류:", error);
+    alert("AI 코멘트 요청 중 오류가 발생했습니다.");
+  }
+}
+
 
 
 
@@ -226,6 +262,7 @@ function makeMemo(memo) {
 
   if (canDelete) {
     const del = document.createElement("button");
+    del.className = "del-btn";
     del.textContent = "×";
     del.title = isTeacher && !isMyMemo ? "교사 권한으로 삭제" : "삭제";
     del.onclick = function () {
@@ -233,7 +270,6 @@ function makeMemo(memo) {
     };
     div.appendChild(del);
   }
-
 
   const span = document.createElement("span");
   span.textContent = memo.text;
@@ -245,12 +281,36 @@ function makeMemo(memo) {
     authorDiv.style.fontSize = "12px";
     authorDiv.style.color = "#888";
     authorDiv.style.marginTop = "8px";
-    authorDiv.textContent = memo.author;
+    authorDiv.textContent = "작성자: " + memo.author;
     div.appendChild(authorDiv);
+  }
+
+  // AI 코멘트가 있는 경우 표시
+  if (memo.aiComment) {
+    const aiCommentDiv = document.createElement("div");
+    aiCommentDiv.className = "ai-comment-box";
+    aiCommentDiv.textContent = "🤖 AI 선생님: " + memo.aiComment;
+    div.appendChild(aiCommentDiv);
+  }
+
+  // 교사(Teacher)에게만 AI 코멘트 생성 버튼 노출
+  if (isTeacher) {
+    const aiBtn = document.createElement("button");
+    aiBtn.className = "ai-btn";
+    aiBtn.textContent = memo.aiComment ? "✨ AI 코멘트 다시 달기" : "✨ AI 코멘트 달기";
+    aiBtn.onclick = async function () {
+      aiBtn.disabled = true;
+      aiBtn.textContent = "⏳ 코멘트 생성 중...";
+      await requestAiComment(memo.id, memo.text);
+      aiBtn.disabled = false;
+      aiBtn.textContent = "✨ AI 코멘트 다시 달기";
+    };
+    div.appendChild(aiBtn);
   }
 
   return div;
 }
+
 
 
 // ===================================================
